@@ -1,6 +1,7 @@
 package com.authservice.user_auth_service.controller;
 
 import com.authservice.user_auth_service.dto.AuthResponse;
+import com.authservice.user_auth_service.dto.LoginRequest;
 import com.authservice.user_auth_service.dto.RegisterRequest;
 import com.authservice.user_auth_service.service.AuthService;
 import jakarta.validation.Valid;
@@ -29,5 +30,12 @@ public class AuthController {
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("Auth Service is running on port 8081");
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request){
+        AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
 
 }
