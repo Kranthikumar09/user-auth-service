@@ -5,12 +5,14 @@ package com.authservice.user_auth_service.service;
 import com.authservice.user_auth_service.dto.AuthResponse;
 import com.authservice.user_auth_service.dto.LoginRequest;
 import com.authservice.user_auth_service.dto.RegisterRequest;
+import com.authservice.user_auth_service.exception.InvalidCredentialsException;
+import com.authservice.user_auth_service.exception.UserAlreadyExistsException;
 import com.authservice.user_auth_service.model.User;
 import com.authservice.user_auth_service.repository.UserRepository;
 import com.authservice.user_auth_service.security.JwtService;
-import com.authservice.user_auth_service.security.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -29,11 +31,11 @@ public class AuthService {
 
     public AuthResponse register (RegisterRequest request){
         if(userRepository.existsByUsername(request.getUsername())){
-            throw new RuntimeException("Username is already taken");
+            throw new UserAlreadyExistsException("Username is already taken");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new UserAlreadyExistsException("Email already registered");
         }
 
         User user = User.builder()
@@ -53,13 +55,17 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            throw new InvalidCredentialsException("Invalid username or password");
+        }
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
         String token = jwtService.generateToken(userDetails);
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
         return new AuthResponse(token, user.getUsername(), user.getRole());
     }
 
