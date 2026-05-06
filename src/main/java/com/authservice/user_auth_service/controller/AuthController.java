@@ -4,6 +4,7 @@ import com.authservice.user_auth_service.dto.AuthResponse;
 import com.authservice.user_auth_service.dto.LoginRequest;
 import com.authservice.user_auth_service.dto.RegisterRequest;
 import com.authservice.user_auth_service.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -37,5 +38,21 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            String token = header.substring(7);
+            try {
+                authService.logout(token);
+                String message = "Logged out successfully";
+                return ResponseEntity.ok(message);
+            } catch (Exception e) {
+                return ResponseEntity.status(400).body("Invalid token");
+            }
 
+        }else {
+            return ResponseEntity.status(400).body("Authorization header missing or invalid");
+        }
+    }
 }

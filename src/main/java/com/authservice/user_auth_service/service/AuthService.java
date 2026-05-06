@@ -28,6 +28,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     public AuthResponse register (RegisterRequest request){
         if(userRepository.existsByUsername(request.getUsername())){
@@ -67,6 +68,11 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
         return new AuthResponse(token, user.getUsername(), user.getRole());
+    }
+
+    public String logout(String token) {
+        tokenBlacklistService.blacklistToken(token);
+        return "Logged out successfully";
     }
 
 
