@@ -28,5 +28,4 @@ public class TokenBlacklistService {
         return redisTemplate.hasKey(key);
     }
 
-
 }

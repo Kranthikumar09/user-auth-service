@@ -47,6 +47,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(500).body(new ErrorResponse(500, "An unexpected error occurred", LocalDateTime.now().toString()));
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
+        return ResponseEntity.status(429).body(new ErrorResponse(429, ex.getMessage(), LocalDateTime.now().toString()));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         ex.printStackTrace();

@@ -6,6 +6,7 @@ import com.authservice.user_auth_service.dto.AuthResponse;
 import com.authservice.user_auth_service.dto.LoginRequest;
 import com.authservice.user_auth_service.dto.RegisterRequest;
 import com.authservice.user_auth_service.exception.InvalidCredentialsException;
+import com.authservice.user_auth_service.exception.TooManyRequestsException;
 import com.authservice.user_auth_service.exception.UserAlreadyExistsException;
 import com.authservice.user_auth_service.model.User;
 import com.authservice.user_auth_service.repository.UserRepository;
@@ -29,6 +30,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final RateLimitService rateLimitService;
 
     public AuthResponse register (RegisterRequest request){
         if(userRepository.existsByUsername(request.getUsername())){
@@ -55,18 +57,24 @@ public class AuthService {
 
     }
 
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String ipAddress) {
+        if( rateLimitService.isRateLimited(ipAddress)){
+            throw new TooManyRequestsException("Too many login attempts. Please try again in 1 minute");
+        }
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
             );
         } catch (BadCredentialsException e) {
+            rateLimitService.recordFailedAttempt(ipAddress);
             throw new InvalidCredentialsException("Invalid username or password");
         }
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
         String token = jwtService.generateToken(userDetails);
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
+        rateLimitService.clearAttempts(ipAddress);
         return new AuthResponse(token, user.getUsername(), user.getRole());
     }
 
