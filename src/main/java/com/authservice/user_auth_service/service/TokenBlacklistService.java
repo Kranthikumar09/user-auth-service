@@ -13,6 +13,7 @@ public class TokenBlacklistService {
 
     private final StringRedisTemplate redisTemplate;
     private final JwtService jwtService;
+    private final MetricsService metricsService;
 
     public void blacklistToken(String token) {
         String key = "blacklist:" + token;
@@ -20,6 +21,7 @@ public class TokenBlacklistService {
 
         if(expirationTime > 0) {
         redisTemplate.opsForValue().set(key, "blacklisted", expirationTime, TimeUnit.MILLISECONDS);
+        metricsService.incrementBlacklistedToken();
         }
     }
 

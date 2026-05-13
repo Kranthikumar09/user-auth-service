@@ -11,6 +11,8 @@ import com.authservice.user_auth_service.exception.UserAlreadyExistsException;
 import com.authservice.user_auth_service.model.User;
 import com.authservice.user_auth_service.repository.UserRepository;
 import com.authservice.user_auth_service.security.JwtService;
+import com.authservice.user_auth_service.security.SecurityEvent;
+import com.authservice.user_auth_service.security.SecurityEventLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -31,6 +33,8 @@ public class AuthService {
     private final UserDetailsService userDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
     private final RateLimitService rateLimitService;
+    private final SecurityEventLogger securityEventLogger;
+    private final MetricsService metricsService;
 
     public AuthResponse register (RegisterRequest request){
         if(userRepository.existsByUsername(request.getUsername())){
@@ -50,6 +54,8 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
+        metricsService.incrementRegistration();
+        securityEventLogger.logEvent(SecurityEvent.REGISTRATION, user.getUsername(), "N/A", "User registered successfully");
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
         String token = jwtService.generateToken(userDetails);
@@ -57,8 +63,10 @@ public class AuthService {
 
     }
 
-    public AuthResponse login(LoginRequest request, String ipAddress) {
+    public  AuthResponse login(LoginRequest request, String ipAddress) {
         if( rateLimitService.isRateLimited(ipAddress)){
+            metricsService.incrementRateLimited();
+            securityEventLogger.logEvent(SecurityEvent.RATE_LIMITED, request.getUsername(), ipAddress, "User exceeded login attempts and is now rate limited");
             throw new TooManyRequestsException("Too many login attempts. Please try again in 1 minute");
         }
 
@@ -68,18 +76,24 @@ public class AuthService {
             );
         } catch (BadCredentialsException e) {
             rateLimitService.recordFailedAttempt(ipAddress);
+            metricsService.incrementLoginFailure();
+            securityEventLogger.logEvent(SecurityEvent.LOGIN_FAILURE, request.getUsername(), ipAddress, "Failed login attempt");
             throw new InvalidCredentialsException("Invalid username or password");
         }
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
         String token = jwtService.generateToken(userDetails);
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
+        metricsService.incrementLoginSuccess();
+        securityEventLogger.logEvent(SecurityEvent.LOGIN_SUCCESS, user.getUsername(), ipAddress, "User logged in successfully");
         rateLimitService.clearAttempts(ipAddress);
         return new AuthResponse(token, user.getUsername(), user.getRole());
     }
 
     public String logout(String token) {
         tokenBlacklistService.blacklistToken(token);
+        metricsService.incrementLogout();
+        securityEventLogger.logEvent(SecurityEvent.LOGOUT, "Unknown", "N/A", "User logged out and token blacklisted");
         return "Logged out successfully";
     }
 
